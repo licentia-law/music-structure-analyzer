@@ -853,4 +853,35 @@ Files are grouped by concern. "Edit size" = small (< 50 lines changed) · medium
 
 ---
 
+## Appendix C — EN/KR Language Toggle (implemented 2026-04-10)
+
+### Approach
+Context-based toggle with no external i18n library. Mirrors the existing `ThemeContext` pattern.
+
+### Files created
+| File | Purpose |
+|------|---------|
+| `src/lib/i18n.ts` | Translation dictionary `{ en: {...}, kr: {...} }`. Single source of truth for all UI strings. |
+| `src/contexts/LangContext.tsx` | `LangProvider` + `useLangContext`. Persists selection to `localStorage` key `'lang'`. Initialises to `'en'` on SSR; syncs from storage after hydration to avoid hydration mismatch. |
+| `src/hooks/useLang.ts` | Convenience hook exposing `{ lang, toggleLang, tr }`. `tr(key)` is a pre-bound translate call. |
+| `src/components/common/LangToggle.tsx` | Button that shows `KR` when lang=en, `EN` when lang=kr. Styled to match `ThemeToggle`. |
+
+### Files modified
+| File | Change |
+|------|--------|
+| `src/app/providers.tsx` | Wrapped tree with `<LangProvider>` inside `<ThemeProvider>`. |
+| `src/components/common/Navigation.tsx` | Imported `useLang` + `LangToggle`; nav labels now use `tr('nav.*')`; `<LangToggle />` placed left of `<ThemeToggle />`. |
+| `src/components/homepage/NewHomePageContent.tsx` | Imported `useLang`; replaced 5 hardcoded strings with `tr(...)` calls (subtitle, feature cards ×2, recent analyses heading/subheading). |
+
+### Translation coverage (MVP)
+- Navigation labels (5 items)
+- Homepage: subtitle, 2 feature cards, recent analyses section
+- Dictionary also pre-defines keys for: search UI, analysis result labels (Key/BPM/Scale/Time Signature/Song Form/Chord Pattern/Scale Degree), section names (Intro/Verse/…/Outro), common UI (Loading, Download, Error, etc.) — ready for Phase 3/4 components.
+
+### Extending translations
+1. Add new keys to `src/lib/i18n.ts` under both `en` and `kr`.
+2. In any component: `const { tr } = useLang(); ... {tr('your.new.key')}`.
+3. No provider or router changes needed.
+
+
 *End of DTL v0.1 — awaiting user review.*

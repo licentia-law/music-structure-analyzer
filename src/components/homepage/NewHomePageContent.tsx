@@ -11,6 +11,7 @@ import HeroScrollingChordAnimation from '@/components/homepage/HeroScrollingChor
 import IntegratedSearchContainer from '@/components/homepage/LazyIntegratedSearchContainer';
 
 import { useTheme } from '@/contexts/ThemeContext';
+import { useLang } from '@/hooks/useLang';
 import { IoMusicalNotes, IoMusicalNote } from 'react-icons/io5';
 import { useSearchBoxVisibility } from '@/hooks/ui/useSearchBoxVisibility';
 import { useSharedSearchState } from '@/hooks/search/useSharedSearchState';
@@ -56,6 +57,7 @@ function NewHomePageContentInner() {
   const titleRef = useRef<HTMLDivElement>(null);
   const searchParams = useSearchParams();
   const { theme } = useTheme();
+  const { tr } = useLang();
   const [mounted, setMounted] = useState(false);
 
   // Track when component has mounted to prevent hydration mismatch
@@ -168,7 +170,7 @@ function NewHomePageContentInner() {
                   }}
                   className="text-base md:text-lg text-slate-600 dark:text-gray-400 font-normal tracking-wide text-center leading-relaxed max-w-lg mx-auto"
                 >
-                  Open source chord & beat detection application. Get your favorite songs transcribed!
+                  {tr('home.subtitle')}
                 </motion.p>
               </div>
             </div>
@@ -210,8 +212,8 @@ function NewHomePageContentInner() {
                 >
                   <HeroChordGridLyricsMock />
                   <div className="p-3">
-                    <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-1 text-sm">Beat & Chord Analysis & Lyrics</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-300">Progressions with Roman numeral analysis, key changes, and sync lyrics</p>
+                    <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-1 text-sm">{tr('home.feature.beatChord')}</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-300">{tr('home.feature.beatChordDesc')}</p>
                   </div>
                 </motion.div>
 
@@ -222,8 +224,8 @@ function NewHomePageContentInner() {
                 >
                   <HeroPianoVisualizerMock />
                   <div className="p-3">
-                    <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-1 text-sm">Piano Visualizer</h4>
-                    <p className="text-xs text-gray-600 dark:text-gray-300">Falling notes visualization with multi-instrument support and MIDI export</p>
+                    <h4 className="font-medium text-gray-800 dark:text-gray-100 mb-1 text-sm">{tr('home.feature.piano')}</h4>
+                    <p className="text-xs text-gray-600 dark:text-gray-300">{tr('home.feature.pianoDesc')}</p>
                   </div>
                 </motion.div>
               </div>
@@ -252,10 +254,10 @@ function NewHomePageContentInner() {
             className="text-center mb-12"
           >
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
-              Recent Analyses
+              {tr('home.recentTitle')}
             </h2>
             <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
-              Explore recently analyzed songs and discover new music through our community
+              {tr('home.recentSubtitle')}
             </p>
           </motion.div>
 

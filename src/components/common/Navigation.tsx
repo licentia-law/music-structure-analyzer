@@ -5,6 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import ThemeToggle from './ThemeToggle';
+import LangToggle from './LangToggle';
+import { useLang } from '@/hooks/useLang';
 
 import StickySearchBar from '@/components/common/StickySearchBar';
 import { Navbar, NavbarBrand, NavbarContent, NavbarItem, NavbarMenuToggle, NavbarMenu, NavbarMenuItem, Button } from '@heroui/react';
@@ -22,6 +24,7 @@ interface NavigationItem {
 
 const Navigation: React.FC<NavigationProps> = ({ className = '', showStickySearch = false }) => {
   const pathname = usePathname();
+  const { tr } = useLang();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [currentHash, setCurrentHash] = useState('');
   const [isClient, setIsClient] = useState(false);
@@ -42,13 +45,13 @@ const Navigation: React.FC<NavigationProps> = ({ className = '', showStickySearc
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
-  // Navigation items configuration
+  // Navigation items configuration (labels are reactive to language)
   const navigationItems: NavigationItem[] = [
-    { href: '/', label: 'Home' },
-    { href: '/#features', label: 'Features', isScroll: true },
-    { href: '/analyze', label: 'Analyze Audio' },
-    { href: '/docs', label: 'API Docs' },
-    { href: '/settings', label: 'Settings' },
+    { href: '/', label: tr('nav.home') },
+    { href: '/#features', label: tr('nav.features'), isScroll: true },
+    { href: '/analyze', label: tr('nav.analyze') },
+    { href: '/docs', label: tr('nav.docs') },
+    { href: '/settings', label: tr('nav.settings') },
   ];
 
   // Close mobile menu when route changes
@@ -205,6 +208,10 @@ const Navigation: React.FC<NavigationProps> = ({ className = '', showStickySearc
           </NavbarItem>
         ))}
         
+
+        <NavbarItem>
+          <LangToggle />
+        </NavbarItem>
 
         <NavbarItem>
           <ThemeToggle />

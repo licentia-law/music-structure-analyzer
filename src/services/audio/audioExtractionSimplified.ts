@@ -225,8 +225,21 @@ export class AudioExtractionServiceSimplified {
       // Step 3: Attempt to upload to Firebase Storage for permanent access
       let finalAudioUrl = downloadResult.audioUrl;
       let isStorageUrl = false;
-      let actualFileSize = 0;
+      let actualFileSize = downloadResult.fileSize || 0;
       const finalDuration = downloadResult.duration || 0;
+
+      // LOCAL BYPASS: skip Firebase Storage upload when SKIP_FIREBASE_STORAGE=true
+      if (process.env.SKIP_FIREBASE_STORAGE === 'true') {
+        console.log(`⚡ Skipping Firebase Storage upload (SKIP_FIREBASE_STORAGE=true), using local URL: ${finalAudioUrl}`);
+        return {
+          success: true,
+          audioUrl: finalAudioUrl!,
+          title: videoMetadata.title,
+          duration: finalDuration,
+          fromCache: false,
+          isStreamUrl: true
+        };
+      }
 
       try {
         // DOCKER FIX: Use localPath directly instead of fetching URL

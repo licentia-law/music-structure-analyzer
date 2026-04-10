@@ -55,7 +55,8 @@ interface HealthResult {
 
 async function checkYtDlpHealth(): Promise<HealthResult> {
   return new Promise((resolve) => {
-    const ytdlp = spawn('yt-dlp', ['--version']);
+    const ytdlpBin = process.env.YTDLP_PATH || 'yt-dlp';
+    const ytdlp = spawn(ytdlpBin, ['--version']);
     let stdout = '';
     let stderr = '';
 

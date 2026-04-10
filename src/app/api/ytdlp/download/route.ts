@@ -87,6 +87,10 @@ async function downloadAudio(url: string, targetFilename?: string, format: strin
       // This ensures we can find the file after download
       const outputTemplate = path.join(tempDir, '%(title)s-[%(id)s].%(ext)s');
 
+      const ffmpegBin = process.env.FFMPEG_PATH
+        ? path.dirname(process.env.FFMPEG_PATH)
+        : undefined;
+
       const args = [
         '--extract-audio',
         '--audio-format', format,
@@ -95,13 +99,15 @@ async function downloadAudio(url: string, targetFilename?: string, format: strin
         '--no-warnings',
         '--restrict-filenames', // Use safe filenames
         '--print', 'after_move:filepath', // Print the final file path
+        ...(ffmpegBin ? ['--ffmpeg-location', ffmpegBin] : []),
         url
       ];
 
-      console.log(`🔧 yt-dlp command: yt-dlp ${args.join(' ')}`);
+      const ytdlpBin = process.env.YTDLP_PATH || 'yt-dlp';
+      console.log(`🔧 yt-dlp command: ${ytdlpBin} ${args.join(' ')}`);
       console.log(`📁 Output template: ${outputTemplate}`);
 
-      const ytdlp = spawn('yt-dlp', args);
+      const ytdlp = spawn(ytdlpBin, args);
       let stderr = '';
       let stdout = '';
       let finalFilePath = '';

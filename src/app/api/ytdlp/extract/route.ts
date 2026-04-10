@@ -89,7 +89,8 @@ async function extractVideoInfo(url: string): Promise<VideoInfo> {
       url
     ];
 
-    const ytdlp = spawn('yt-dlp', args);
+    const ytdlpBin = process.env.YTDLP_PATH || 'yt-dlp';
+    const ytdlp = spawn(ytdlpBin, args);
     let stdout = '';
     let stderr = '';
 

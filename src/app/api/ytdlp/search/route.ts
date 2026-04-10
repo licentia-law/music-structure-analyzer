@@ -146,7 +146,8 @@ async function searchWithYtDlp(query: string, limit: number): Promise<{
       // Format: ytsearch{limit}:{query} to get specific number of results
       const searchQuery = `ytsearch${limit}:${query}`;
       
-      const ytdlp = spawn('yt-dlp', [
+      const ytdlpBin = process.env.YTDLP_PATH || 'yt-dlp';
+      const ytdlp = spawn(ytdlpBin, [
         '--dump-json',
         '--no-download',
         '--flat-playlist',
