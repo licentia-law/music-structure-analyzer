@@ -45,58 +45,139 @@ Difficulty rubric: **S** ≈ <½ day · **M** ≈ 1 day · **L** ≈ 2–3 days 
 **Why this phase exists:** PRD assumes fork, but never audits the fork. Without this audit we cannot estimate M1–M4 accurately or identify upstream features we should reuse instead of rewriting.
 
 ### P0-01: Read ChordMiniApp README + high-level architecture
-- Status: TODO
+- Status: DONE
 - Difficulty: S
 - Dependencies: none
 - Input: github.com/ptnghia-j/ChordMiniApp
 - Output: Short notes in DTL appendix A.1 — "ChordMiniApp overview"
 - Done criteria: Can answer: directory layout? entry points? which services run where? license/attribution requirements?
-- Notes: Do NOT clone yet. Read via web first to keep disk clean.
+- Notes: Do NOT clone yet. Read via web first to keep disk clean. → Completed 2026-04-10. See Appendix A.1.
 
 ### P0-02: Map existing features → PRD requirements
-- Status: TODO
+- Status: DONE
 - Difficulty: M
 - Dependencies: P0-01
 - Input: ChordMiniApp feature list, PRD §3
 - Output: Gap matrix in DTL appendix A.2 — columns: `PRD feature | Upstream status (have/partial/none) | Customization strategy`
 - Done criteria: Every PRD P0/P1 feature has a row. "Partial" rows state exactly what is missing.
-- Notes: This matrix drives all downstream task sizing. Be honest about "partial" — over-optimism here causes M3 slip.
+- Notes: Completed 2026-04-10. See Appendix A.2. Key finding: core ML pipeline ~70% ready; all download features and Pattern Table are `none`; required libraries (html2canvas, jspdf) are already in package.json.
 
 ### P0-03: Identify customization touchpoints
-- Status: TODO
+- Status: DONE
 - Difficulty: M
 - Dependencies: P0-02
 - Input: Gap matrix
 - Output: DTL appendix A.3 — list of upstream files/modules we expect to modify, grouped by concern (UI, chord post-processing, routing, etc.)
 - Done criteria: Each file has a one-line "why" and expected edit size (small/medium/rewrite).
-- Notes: Prefer minimal surgical edits. Flag any file where a rewrite feels necessary — that is a risk signal.
+- Notes: Completed 2026-04-10. See Appendix A.3. 4 upstream files to modify; ~10 new files to create. Largest risk: Pattern Table is full new development.
 
 ### P0-04: Verify ML model availability & CPU feasibility
-- Status: TODO
+- Status: DONE
 - Difficulty: M
 - Dependencies: P0-01
 - Input: ChordMiniApp model list (SongFormer, Beat-Transformer, Chord-CNN-LSTM, BTC)
 - Output: Notes on (a) model weights download path, (b) approximate runtime on CPU for a 3-min track, (c) memory footprint
 - Done criteria: Confirmed each model can run on the target EC2 tier; or flagged as a risk with mitigation.
-- Notes: PRD §7 already flags CPU speed. This task produces the data to decide EC2 instance size.
+- Notes: Completed 2026-04-10. See P0-04 Notes below.
+  **[Updated P0-01]** ChordMiniApp has TWO separate Python services with conflicting torch versions:
+  - `python_backend/`: torch 2.6.0, tensorflow 2.15.1, madmom — Beat-Transformer, Chord-CNN-LSTM, BTC
+  - `SongFormer/`: torch 2.2.2, transformers 4.51.1 — SongFormer inference only
+  CPU feasibility must be verified for **both services independently**. Memory footprint estimate must account for both running simultaneously on the same EC2 instance.
+
+  **P0-04 Notes (CPU Feasibility):**
+
+  *(a) Model weight download paths:*
+  - Beat-Transformer, Chord-CNN-LSTM, BTC: Git submodules in `python_backend/models/`; weights downloaded at runtime (deferred loading on first request).
+  - SongFormer: loaded via HuggingFace `from_pretrained()` at runtime (HuggingFace Hub: ASLP-lab/SongFormer).
+  - Spleeter 5-stems (~200 MB): pre-downloaded during Docker build.
+  - No weights are bundled in the repo; all fetched on first request or build.
+
+  *(b) Approximate CPU runtime for a 3-minute track:*
+  > ⚠ 아래 수치는 논문/벤치마크 extrapolation 추정값이며, 실제 측정값이 아님. **P1-07 smoke test에서 실측 후 이 표를 업데이트할 것.**
+
+  | Component | 추정 CPU time | 근거 |
+  |-----------|-------------|------|
+  | Spleeter (source separation) | 30–60 s | Deezer 공개 벤치마크 |
+  | Beat-Transformer | 60–180 s | ISMIR 2022 논문 + transformer 복잡도 추정 |
+  | Chord-CNN-LSTM / BTC | 5–15 s | CNN-LSTM 일반 벤치마크 |
+  | SongFormer | 10–30 s | 논문 "blazing fast inference" 언급 + 4-layer 소형 모델 |
+  | madmom RNNBeatProcessor | 5–20 s | RNN 일반 벤치마크 |
+  | **Total (sequential, both backends)** | **~2–5 minutes** | 상단 합산 |
+
+  *(c) Memory footprint:*
+  | Scenario | RAM required |
+  |----------|-------------|
+  | python_backend loaded | 2.0–2.5 GB |
+  | SongFormer loaded | 1.5–2.0 GB |
+  | Both + 1 request in flight | 3.0–4.0 GB |
+  | Safe production (2× headroom) | **8–10 GB** |
+
+  **EC2 Sizing Decision:**
+  - **Recommended: t3.xlarge (4 vCPU / 16 GB, ~$121/month)** — provides memory headroom, burstable CPU suits periodic inference workload.
+  - Fallback: c5.2xlarge (8 vCPU / 16 GB, ~$248/month) for more consistent latency.
+  - t3.medium/t3.large are insufficient (4–8 GB RAM is too tight).
+  - **Risk flag:** 2–5 min per track is tolerable only with async queue + Firebase cache (already planned).
 
 ### P0-05: Review upstream license & attribution obligations
-- Status: TODO
+- Status: DONE
 - Difficulty: S
 - Dependencies: P0-01
 - Input: ChordMiniApp LICENSE file, third-party model licenses
 - Output: Short compliance note — what attribution we must preserve, what we can rename/rebrand.
 - Done criteria: Clear yes/no on: (1) can we close-source our fork? (2) what notices must appear in UI/README?
-- Notes: ChordMiniApp is MIT, so likely permissive. Models may have separate licenses.
+- Notes: Completed 2026-04-10. ChordMiniApp is MIT, so likely permissive. Models may have separate licenses.
+
+  **P0-05 Output (License Audit):**
+
+  | Model / Library | License | Commercial OK? | Private service OK? | Attribution needed? |
+  |-----------------|---------|---------------|--------------------|--------------------|
+  | ChordMiniApp (app code) | MIT | Yes | Yes | Yes — include MIT notice in repo |
+  | SongFormer | CC BY 4.0 | Yes | Yes | Yes — credit ASLP-lab/SJTU |
+  | Beat-Transformer | MIT | Yes | Yes | Yes — MIT notice |
+  | BTC (chord recognition) | MIT | Yes | Yes | Yes — MIT notice |
+  | Chord-CNN-LSTM | **Unknown** (likely MIT via ChordMiniApp) | ? | ? | Verify before launch |
+  | madmom (models) | **CC-BY-NC-SA 4.0** | **NO** | Yes (zero-revenue) | Yes — credit CPJKU/Widmer |
+  | MuQ weights (SSL features) | **CC-BY-NC 4.0** | **NO** | Yes (zero-revenue) | Yes — credit Tencent AI Lab |
+  | MusicFM (SSL alternative) | MIT + Apache 2.0 | Yes | Yes | Yes |
+  | librosa | ISC | Yes | Yes | No |
+  | yt-dlp | Unlicense | Yes | Yes | No |
+
+  **Key compliance answers:**
+  1. **Can we close-source our fork?** YES — app code is MIT; model weights remain under their original licenses.
+  2. **Can we use these models for a private friend-group service?** YES — as long as zero revenue. madmom (CC-BY-NC-SA) and MuQ (CC-BY-NC) block any monetization.
+  3. **What notices must appear?** An "Open Source Credits" section in README crediting ChordMiniApp, SongFormer, Beat-Transformer, BTC, madmom, MuQ.
+  4. **Any research-only models?** madmom (CC-BY-NC-SA) and MuQ weights (CC-BY-NC) are non-commercial. Fine for zero-revenue friend group use. If monetization planned: replace madmom with librosa, MuQ with MusicFM.
+  5. **Risk flag:** Chord-CNN-LSTM license unknown — verify during P1-04 when inspecting the actual submodule.
 
 ### P0-06: Decide Phase 1 entry conditions
-- Status: TODO
+- Status: IN PROGRESS
 - Difficulty: S
 - Dependencies: P0-02, P0-03, P0-04, P0-05
 - Input: All Phase 0 outputs
 - Output: Go/No-Go decision, recorded as a short note at the top of Phase 1.
 - Done criteria: User has reviewed Phase 0 findings and approved fork execution.
-- Notes: If gap matrix shows too much missing work, we may revisit "fork vs build from scratch".
+- Notes: Draft Go/No-Go below — **awaiting user review**.
+
+  **Phase 0 Summary & Go/No-Go Draft:**
+
+  | Area | Finding | Risk level |
+  |------|---------|------------|
+  | Upstream reuse | Core ML pipeline ~70–80% ready (BPM, chord, song structure, beats) | Low |
+  | Gap — Pattern Table | Pattern Table + Scale Degree: 100% new development (~3–4 weeks) | Medium |
+  | Gap — Downloads | All 3 formats: 0% upstream; BUT all required npm libs (html2canvas, jspdf) already in package.json | Low |
+  | Gap — Auth | No upstream auth; simple env-var password is ~1 day work | Low |
+  | CPU feasibility | 2–5 min/track; within tolerance with async + Firebase cache | Medium |
+  | License | App code MIT-clean; models are non-commercial acceptable for friend group | Low |
+  | Layout mismatch | ChordMiniApp has no frontend/ subdir — P1-02 must resolve integration layout | Low |
+  | Chord-CNN-LSTM license | Unknown — verify in P1-04 | Low (likely MIT) |
+
+  **Preliminary recommendation: GO (fork & customize)**
+  - The fork provides substantial acceleration (60–70% of pipeline already works).
+  - All download library dependencies are pre-installed in package.json.
+  - Pattern Table is the largest unknown but is architecturally independent (pure frontend + pure-function algorithm).
+  - No blocking license issues for the target use case (private, non-commercial).
+
+  **→ User action required: Approve or request changes before P1-01 begins.**
 
 ---
 
@@ -125,6 +206,9 @@ Difficulty rubric: **S** ≈ <½ day · **M** ≈ 1 day · **L** ≈ 2–3 days 
   - **(b) Place fork as a sibling directory** under `app/` or similar, keep `docs/` top-level.
   - **(c) Git submodule** (more complex, usually worse for forks).
   - Recommend (a) unless there's a reason to keep docs separate.
+  **[Updated P0-01]** ChordMiniApp puts Next.js at the **repo root** (no `frontend/` subdirectory).
+  CLAUDE.md §4 layout plan (`frontend/`, `backend/`) does not match upstream structure.
+  This decision must explicitly resolve: do we adopt upstream's root-level layout, or restructure into subdirs?
 
 ### P1-03: Integrate fork into repository
 - Status: TODO
@@ -135,23 +219,26 @@ Difficulty rubric: **S** ≈ <½ day · **M** ≈ 1 day · **L** ≈ 2–3 days 
 - Done criteria: `git log` shows fork history; `git remote -v` shows both `origin` (ours) and `upstream` (ChordMiniApp).
 - Notes: Be very careful not to overwrite `docs/PRD.md`, `docs/DTL.md`, `CLAUDE.md`.
 
-### P1-04: Install backend Python environment
+### P1-04: Install backend Python environments
 - Status: TODO
 - Difficulty: M
 - Dependencies: P1-03
-- Input: Backend directory, upstream `requirements.txt` (or equivalent)
-- Output: Working `.venv` with all Python deps installed.
-- Done criteria: `python -c "import <key modules>"` runs without error; `pip list` matches `requirements.txt`.
-- Notes: Target Python version depends on ChordMiniApp — confirm in P0-01. Use `.venv` **inside `backend/`**, not in repo root.
+- Input: `python_backend/requirements.txt`, `SongFormer/requirements.txt`
+- Output: Two working `.venv` environments, one per service.
+- Done criteria: Each service passes `python -c "import torch; import flask"` in its own venv; `pip list` matches respective `requirements.txt`.
+- Notes: **[Updated P0-01]** TWO separate venvs required — torch versions conflict (2.6.0 vs 2.2.2), cannot share one env.
+  - `python_backend/.venv` — Python 3.10.x, torch 2.6.0, tensorflow 2.15.1, madmom
+  - `SongFormer/.venv` — Python **3.10.16** (pinned in `.python-version`), torch 2.2.2, transformers 4.51.1
+  Use `python -m venv .venv` inside each directory. Never install globally.
 
 ### P1-05: Install frontend Node environment
 - Status: TODO
 - Difficulty: S
 - Dependencies: P1-03
-- Input: Frontend directory, `package.json`
+- Input: Repo root `package.json` (Next.js is at repo root, not in `frontend/`)
 - Output: `node_modules` installed; dev server starts.
-- Done criteria: `npm run dev` (or pnpm) brings up a local page without console errors.
-- Notes: Confirm package manager from lockfile (`package-lock.json` vs `pnpm-lock.yaml`).
+- Done criteria: `npm run dev` brings up a local page without console errors.
+- Notes: **[Updated P0-01]** Package manager is **npm** (confirmed — `package-lock.json`, `.npmrc`, README). Node.js 20 recommended (matches production Dockerfile `node:20-alpine`). Run `npm install` at repo root.
 
 ### P1-06: Download ML model weights
 - Status: TODO
@@ -515,13 +602,249 @@ Difficulty rubric: **S** ≈ <½ day · **M** ≈ 1 day · **L** ≈ 2–3 days 
 # Appendices (to be filled during Phase 0)
 
 ## Appendix A.1 — ChordMiniApp overview
-*(Fill during P0-01)*
+*(Filled 2026-04-10, P0-01 DONE)*
+
+### A.1.1 Directory Layout
+
+The repo root **is** the Next.js frontend (not a `frontend/` subdirectory).
+Two separate Python backends coexist under the root.
+
+```
+ChordMiniApp/                        ← Next.js app root
+├── Dockerfile                       ← Frontend production image (node:20-alpine)
+├── docker-compose.prod.yml          ← Production stack
+├── package.json                     ← Frontend deps (npm)
+├── .env.example                     ← All env vars documented
+├── .gitmodules                      ← Git submodules present
+├── .firebaserc
+├── LICENSE                          ← MIT, Copyright 2025 ChordMini Project
+├── README.md
+├── CONTRIBUTING.md
+│
+├── src/                             ← Next.js App Router source
+│   └── app/                         ← Pages, components, API routes
+│
+├── public/                          ← Static assets
+│
+├── python_backend/                  ← Main ML Flask backend
+│   ├── app.py                       ← Entry point
+│   ├── app_factory.py               ← create_app(), blueprint registration
+│   ├── requirements.txt
+│   └── [blueprints: beats, chords, lyrics, youtube, audio, health, debug, docs]
+│
+├── SongFormer/                      ← Separate SongFormer inference service
+│   ├── app.py                       ← Flask app entry point
+│   ├── sequential_inference.py
+│   ├── requirements.txt
+│   ├── .python-version              ← pins 3.10.16
+│   ├── Dockerfile
+│   └── src/
+│       ├── SongFormer/              ← model, configs, checkpoints
+│       └── data_pipeline/           ← SSL feature extraction (MuQ, MusicFM)
+│
+└── sheetsage/                       ← Experimental melody transcription (Docker only)
+```
+
+**Impact on our fork layout:**
+Our `CLAUDE.md` §4 shows `frontend/` and `backend/` as separate dirs — but ChordMiniApp puts Next.js at the root. We must revisit the integration layout decision in P1-02.
+
+---
+
+### A.1.2 Entry Points
+
+| Component | File | Dev command | Default port |
+|-----------|------|-------------|--------------|
+| Frontend (Next.js) | `src/app/` | `npm run dev` | 3000 |
+| Main Python backend | `python_backend/app.py` | `python app.py` | **5001** |
+| SongFormer service | `SongFormer/app.py` | `python app.py` | **8080** |
+| Sheet Sage (experimental) | `sheetsage/` | Docker only | 8082 |
+
+Note: Backend uses port **5001** (not 5000) to avoid conflict with macOS AirPlay.
+
+---
+
+### A.1.3 Services — Where They Run
+
+| Service | Technology | Port (dev) | Port (prod Docker) |
+|---------|-----------|------------|--------------------|
+| Frontend | Next.js 16 + React 19 + TypeScript + Tailwind CSS | 3000 | 3000 |
+| Main backend | Flask 3.0.3 + gunicorn 21.2.0 | 5001 | 8080 |
+| SongFormer service | Flask 3.1.0 + gunicorn 23.0.0 | 8080 | 8080 |
+
+**ML pipeline components (all in `python_backend/`):**
+- Beat/BPM: Beat-Transformer + madmom + DBN
+- Chord recognition: Chord-CNN-LSTM + BTC
+- Song structure: SongFormer (via separate service at `SONGFORMER_API_URL`)
+- Audio extraction: yt-dlp (primary), yt-mp3-go (fallback)
+- Chord correction: Google Gemini API
+- Source separation: Spleeter
+
+**Key env vars:**
+- `PYTHON_API_URL` → main backend URL (default `http://localhost:5001`)
+- `SONGFORMER_API_URL` → SongFormer URL (default `http://localhost:8080`)
+- `NEXT_PUBLIC_FIREBASE_*` (6 vars), `NEXT_PUBLIC_GEMINI_API_KEY`, `NEXT_PUBLIC_YOUTUBE_API_KEY`
+
+**Python version:** `SongFormer/.python-version` pins **3.10.16**. Both services must use Python 3.10.x. `python_backend` has 3.10 compat shims for numpy/collections deprecations.
+
+**Conflicting torch versions:** `python_backend` uses torch 2.6.0; `SongFormer` uses torch 2.2.2. They **must run in separate `.venv` environments** — they cannot share one.
+
+**Package manager:** **npm** (confirmed by `package.json`, `.npmrc`, `node:20-alpine` in Dockerfile, README: "Node.js 18+ with npm"). No pnpm.
+
+**Production Docker (`docker-compose.prod.yml`):**
+- `chordmini-frontend` (port 3000) + `chordmini-backend` (port 8080) on `chordmini-network`
+- Volume `backend-cache` → `/tmp/model_cache` for ML model caching
+- Health check: `GET /api/health` every 30 s
+
+---
+
+### A.1.4 License & Attribution
+
+**License:** MIT, Copyright (c) 2025 ChordMini Project.
+
+| Question | Answer |
+|----------|--------|
+| Can we close-source our fork? | **Yes** — MIT permits proprietary derivatives |
+| Must we publish our changes? | **No** — MIT has no copyleft obligation |
+| What notices must appear? | Include `Copyright (c) 2025 ChordMini Project` + MIT License text somewhere in the repo (e.g., `NOTICE` or alongside our own `LICENSE`). No UI attribution required by the license, but good practice. |
+| Can we rename/rebrand? | **Yes** — MIT does not restrict naming |
+| Third-party model licenses | Verify separately in P0-05: SongFormer, Beat-Transformer, Chord-CNN-LSTM, BTC may have their own academic/research-use licenses. |
+
+**Action for P0-05:** Audit model-level licenses (SongFormer, Beat-Transformer, BTC, Chord-CNN-LSTM checkpoints). The app framework is MIT-clean; the ML weights may differ.
+
+---
+
+### A.1.5 Key Dependency Versions (for P1-04 / P1-05 planning)
+
+**Frontend (npm):** Next.js 16, React 19, TypeScript 5, Tailwind CSS, Firebase SDK, Zustand, Axios, Framer Motion, `@google/generative-ai`, `@tombatossals/react-chords`, `ytdl-core`.
+
+**`python_backend/requirements.txt` highlights:**
+```
+numpy==1.26.4
+flask==3.0.3  /  gunicorn==21.2.0
+librosa==0.10.1
+tensorflow==2.15.1       # Chord-CNN-LSTM
+torch==2.6.0             # Beat-Transformer
+spleeter==2.3.2
+yt-dlp==2025.4.30
+madmom>=0.16.1
+scipy==1.13.1
+```
+
+**`SongFormer/requirements.txt` highlights:**
+```
+torch==2.2.2  /  torchaudio==2.2.2   # ← different from python_backend!
+transformers==4.51.1
+huggingface-hub==0.30.1
+librosa==0.11.0
+flask==3.1.0  /  gunicorn==23.0.0
+omegaconf==2.3.0
+einops==0.8.1
+x-transformers==2.4.14
+```
 
 ## Appendix A.2 — Gap matrix
-*(Fill during P0-02)*
+*(Filled 2026-04-10, P0-02 DONE)*
+
+Legend: `have` = fully implemented upstream · `partial` = exists but needs work · `none` = not present
+
+### Core Pipeline Features (PRD §3.1–3.2 explicit P0)
+
+| # | Feature | PRD Ref | Upstream status | What is missing / what to do |
+|---|---------|---------|-----------------|------------------------------|
+| 1 | YouTube URL input + validation | §3.1 | `have` | URL validation + search via YouTube API already implemented. Minor UI restyling may be needed. |
+| 2 | Audio extraction (yt-dlp → WAV) | §3.1 | `partial` | yt-dlp extraction exists (`src/app/api/extract-audio`). Fallback yt-mp3-go also present. WAV conversion is abstracted — verify format selection produces WAV output specifically during P1-07 smoke test. |
+| 3 | Key / Scale detection | §3.2 P0 | `partial` | Key detection exists but ChordMiniApp uses **Gemini API** (`src/app/api/detect-key`), not librosa Krumhansl-Schmuckler. Returns key name; does NOT return scale table. **Two actions:** (A) Confirm python_backend librosa K-S path exists or add it; (B) Build scale table generator (Bb=1, C=2 …) from key name — entirely new UI logic. |
+| 4 | BPM detection | §3.2 P0 | `have` | Beat-Transformer in `python_backend/models/`; BPM endpoint in beats blueprint. No changes needed. |
+| 5 | Time Signature detection | §3.2 P0 | `partial` | Beat-Transformer provides beat positions and downbeats. Time-signature inference from beat/downbeat spacing is **not confirmed** in source. **Action:** Implement meter detection (madmom meter or custom heuristic) and surface it as a response field. |
+| 6 | Song Form analysis (SongFormer) | §3.2 P0 | `partial` | SongFormer runs as a **separate service** (port 8080); python_backend calls it via `SONGFORMER_API_URL`. Segmentation boundaries and raw labels are returned. **Missing:** (A) Label → abbreviation mapping (I/V/PC/C/B/Inst/O) — **to be implemented as frontend post-processing** (`src/lib/songFormLabelMapper.ts`); (B) Pre-Chorus heuristic (short segment between V and C) — same frontend layer. ⚠ No `python_backend/blueprints/songformer.py` exists per A.1.1; verify exact call path in P1-07. |
+| 7 | Analysis result page (Song Info Card) | §4.2 | `partial` | `src/app/analyze/[videoId]/page.tsx` (57 KB) has BPM, key, chord display. **Missing in UI:** scale table row (Bb=1 …), time signature display, Song Form one-line summary with abbreviations. Card layout needs redesign. |
+| 18 | Chord recognition (CNN-LSTM / BTC) | §5.1 | `have` | Chord-CNN-LSTM + BTC both available in `python_backend/models/` (git submodules). Chord timestamps returned by chords blueprint. Used as input to Pattern Table — no upstream changes needed for core recognition. |
+| 19 | Source separation (Spleeter) | §5.1 | `have` | Spleeter 5-stems pre-downloaded in Docker build. Used internally to improve chord/beat accuracy. No API surface change needed. |
+| 20 | Chord correction (Gemini API) | §7 | `have` | Gemini API correction already integrated (PRD §7 risk mitigation). No changes needed unless accuracy is unsatisfactory. |
+
+### Customization & Extras (PRD §3.2 P1, §3.3, §4–5)
+
+| # | Feature | PRD Ref | Upstream status | What is missing / what to do |
+|---|---------|---------|-----------------|------------------------------|
+| 8 | Pattern Table UI | §3.2 P1 | `none` | **Core custom feature. 100% new.** ChordMiniApp has `ChordGrid.tsx` / `ChordCell.tsx` for chord display, but NOT the beat-slot table format (e.g. `Bb---`, `Eb-G-`). Requires: (A) measure-boundary algorithm (Phase 3), (B) chord-to-beat-slot placement, (C) new React table component with chord row + Scale Degree row. |
+| 9 | Scale Degree auto-calculation | §5.2 | `none` | **New pure function.** Key detection exists; chord detection exists; but mapping chord root → 1–7 is not implemented. ~50 lines. Handle enharmonics (C#↔Db) and chromatic chords (return null or flag). |
+| 10 | Repeat grouping in pattern tables | §5.3 | `none` | **New algorithm.** Detect consecutive identical chord patterns, group as "×N" rows. Can be deferred post-MVP (flag to user at P3-09). |
+| 11 | Download as .md | §3.3 | `none` | **New.** `react-markdown` already in package.json. Build `toMarkdown(result)` serializer + browser download trigger. ~100 lines. |
+| 12 | Download as .png | §3.3 | `none` | **New.** `html2canvas ^1.4.1` already in package.json. Wire to result container + download. ~50 lines. CORS risk with YouTube thumbnails — use `useCORS: false` or exclude thumbnail. |
+| 13 | Download as .pdf | §3.3 | `none` | **New.** `jspdf ^4.2.1` already in package.json. Use frontend jsPDF (simpler, no Puppeteer needed). ~150 lines. Multi-page support needed for long section lists. |
+| 14 | Simple shared-password auth | §5.4 | `none` | **New.** No auth in upstream. Implement env-var password check in Next.js middleware (`middleware.ts`). Store session in cookie. ~100 lines frontend. |
+| 15 | YouTube embed player | §3.3 | `partial` | `CollapsibleVideoPlayer.tsx` (13.7 KB) and `FloatingVideoDock.tsx` (14.4 KB) exist. Integration into result page needs verification during P2-01. |
+| 16 | Progress indicator | §4.1 | `have` | `ProgressBar.tsx`, `ProcessingStatusBanner.tsx`, `ProcessingBanners.tsx` all present. Wire-up check during P1-07. |
+| 17 | Recent analyses list (Firebase) | §4.1 | `partial` | Firebase Firestore used for caching transcriptions/keys/segmentation. Infrastructure exists. **Missing:** UI component on homepage displaying recent analyses. |
+
+### Summary
+
+| Category | Count |
+|----------|-------|
+| `have` — no work needed | 5 (BPM, Chord recognition, Spleeter, Gemini correction, Progress indicator) |
+| `partial` — upstream logic exists, customization needed | 8 |
+| `none` — new development | 7 |
+| **Total features** | **20** |
+
+**Installed but unused npm libs (ready to wire):** `html2canvas`, `jspdf`, `react-markdown`.
+**Largest gap:** Pattern Table (feature #8) — 100% new, drives Phase 3 (2–3 weeks estimated).
+
+---
 
 ## Appendix A.3 — Customization touchpoints
-*(Fill during P0-03)*
+*(Filled 2026-04-10, P0-03 DONE)*
+
+Files are grouped by concern. "Edit size" = small (< 50 lines changed) · medium (50–200 lines) · rewrite (primary logic replaced).
+
+### Group 1: Backend — Python
+
+| File | Why we touch it | Edit size |
+|------|-----------------|-----------|
+| `python_backend/blueprints/beats.py` (or equivalent) | Surface time-signature field in beat response (madmom meter detection or downbeat-interval heuristic) | small–medium |
+
+**⚠ Risk flags:**
+- `python_backend/blueprints/songformer.py`는 A.1.1 blueprint 목록(`beats, chords, lyrics, youtube, audio, health, debug, docs`)에 **없음**. SongFormer는 독립 서비스(port 8080)로 작동하므로 레이블 매핑은 **프론트엔드에서 후처리**하는 것이 올바른 위치. P1-07에서 실제 호출 경로(Next.js → python_backend → SongFormer vs Next.js → SongFormer 직접) 확인 후 확정.
+- Key detection이 Gemini API 전용인 경우, librosa K-S 결과를 노출하는 새 endpoint 추가 필요. 마찬가지로 P1-07에서 확인.
+
+### Group 2: Frontend — Existing pages/components
+
+| File | Why we touch it | Edit size |
+|------|-----------------|-----------|
+| `src/app/analyze/[videoId]/page.tsx` | Replace/extend Song Info Card section to show scale table, time sig, Song Form summary with abbreviations; add Pattern section stub | medium |
+| `src/app/page.tsx` | Add Recent Analyses list component below URL input form | small |
+
+### Group 3: Frontend — New files (100% new, not modifying upstream)
+
+| New file | Purpose | Complexity |
+|----------|---------|------------|
+| `src/components/SongInfoCard.tsx` | Renders Key / Scale table / BPM / Time / Song Form summary card | medium |
+| `src/components/PatternTable.tsx` | Beat-slot chord table with Scale Degree row per section | **rewrite** (largest single component) |
+| `src/components/SectionPanel.tsx` | Collapsible panel per song section (wraps PatternTable) | medium |
+| `src/lib/songFormLabelMapper.ts` | Pure function: SongFormer raw label → I/V/PC/C/B/Inst/O 매핑 + Pre-Chorus 휴리스틱. frontend 후처리 레이어 (Group 1의 songformer.py 가정 오류 대체). | small |
+| `src/lib/scaleDegree.ts` | Pure function: `chordRootToDegree(chord, key) → 1..7 \| null` | small |
+| `src/lib/measureBuilder.ts` | Pure function: `buildMeasures(beats, downbeats, timeSig) → Measure[]` | medium |
+| `src/lib/chordPlacement.ts` | Pure function: `placeChordsInMeasures(measures, chords) → MeasureWithSlots[]` | medium |
+| `src/lib/exportMarkdown.ts` | `toMarkdown(result) → string` + download trigger | small |
+| `src/lib/exportPng.ts` | html2canvas capture + download trigger | small |
+| `src/lib/exportPdf.ts` | jsPDF multi-page generation + download trigger | small–medium |
+| `src/middleware.ts` | Next.js middleware for env-var password gate | small |
+
+### Group 4: Configuration
+
+| File | Why we touch it | Edit size |
+|------|-----------------|-----------|
+| `.env.example` | Add `AUTH_PASSWORD` env var entry | small |
+| `docker-compose.prod.yml` | Add SongFormer service if not already separate; add `AUTH_PASSWORD` env var; resource limits for EC2 | small |
+
+### Touchpoint risk summary
+
+| Risk | Location | Mitigation |
+|------|----------|------------|
+| Key detection path (Gemini vs librosa) | `src/app/api/detect-key/` + `python_backend/` | Verify in P1-07; add librosa endpoint if needed |
+| SongFormer 호출 경로 불확실 (Next.js → backend → SongFormer vs 직접 호출) | `python_backend/` vs `SongFormer/app.py` | P1-07에서 실제 request 경로 확인 후 레이블 매핑 위치 확정 |
+| Chord-CNN-LSTM license unknown | `python_backend/models/` submodule | Inspect LICENSE in submodule during P1-04 |
+| PatternTable is 100% new with complex algorithm | `src/components/PatternTable.tsx` + 4 lib files | Phase 3 is dedicated to this; design before code (P3-03, P3-05) |
+| Pre-Chorus heuristic may break for some songs | `src/lib/songFormLabelMapper.ts` | Document exact rule; flag to user in P2-04 |
 
 ## Appendix B — Upstream files modified
 *(Running log, updated throughout all phases)*

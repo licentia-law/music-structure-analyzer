@@ -5,6 +5,8 @@
       "Write(**)",
       "Edit(**)",
       "MultiEdit(**)",
+      "Fetch(**)",
+      "Web Search(**)",
       "Glob",
       "Grep",
       "LS",

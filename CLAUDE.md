@@ -31,12 +31,21 @@ Read before starting any task in this repository.
 
 ## 3. Current Phase
 
-**Phase 0 — Pre-investigation (no code yet).**
+**Phase 0 — Pre-investigation (in progress).**
 
 - `docs/PRD.md` exists (product spec, v1.0)
 - `docs/DTL.md` exists (detailed task list — the execution document you should follow)
-- No fork, no source code, no dependencies installed yet
-- Next concrete step: **Phase 0 tasks in DTL.md** (ChordMiniApp structure analysis + customization point mapping)
+- No fork, no source code installed yet
+- **P0-01 DONE** (2026-04-10): ChordMiniApp architecture analyzed — see DTL Appendix A.1
+- Next step: **P0-02** (gap matrix) and **P0-03** (customization touchpoints)
+
+**Critical findings from P0-01 (affects fork layout plan):**
+- ChordMiniApp puts Next.js at the **repo root** (not in `frontend/`)
+- There are **two separate Python backends**: `python_backend/` (port 5001) and `SongFormer/` (port 8080)
+- Both backends need **separate `.venv`** due to conflicting torch versions (2.6.0 vs 2.2.2)
+- Package manager is **npm** (not pnpm)
+- Python version: **3.10.16** (pinned by SongFormer)
+- The `frontend/` and `backend/` layout in §4 below needs revision at P1-02
 
 **When the phase changes, update this section.**
 
