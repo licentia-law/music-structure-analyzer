@@ -107,7 +107,9 @@ async function downloadAudio(url: string, targetFilename?: string, format: strin
       console.log(`🔧 yt-dlp command: ${ytdlpBin} ${args.join(' ')}`);
       console.log(`📁 Output template: ${outputTemplate}`);
 
-      const ytdlp = spawn(ytdlpBin, args);
+      const ytdlp = spawn(ytdlpBin, args, {
+        env: { ...process.env }
+      });
       let stderr = '';
       let stdout = '';
       let finalFilePath = '';

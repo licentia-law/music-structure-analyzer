@@ -71,8 +71,21 @@ music-structure-analyzer/
 
 ## 5. Working Rules
 
-### 5.1 Base directory
-- **All work output goes to the project base folder** (this worktree root, which merges back to `main`).
+### 5.1 Base directory and worktree awareness
+
+**CRITICAL — Read this before creating or editing any file.**
+
+This project uses git worktrees. Claude Code sessions may run inside a worktree:
+
+```
+Main repo (main branch):   /Users/law/Downloads/Dev/music-structure-analyzer/
+Worktree (feature branch): /Users/law/Downloads/Dev/music-structure-analyzer/.claude/worktrees/<name>/
+```
+
+- **The Next.js dev server and build always run from the main repo path**, not the worktree.
+- Files created inside a worktree only exist on that worktree's branch — they are **invisible to the running build** until the branch is merged.
+- **Before creating or editing any source file, confirm which path you are working in** (`pwd`). If you are inside a worktree path (contains `.claude/worktrees/`), you must also apply the same change to the main repo path, or work directly in the main repo.
+- A safe default: **always write source files to the main repo path** (`/Users/law/Downloads/Dev/music-structure-analyzer/src/...`) unless the task is explicitly scoped to the worktree branch only.
 - Do not create files outside this directory tree.
 
 ### 5.2 Documents
