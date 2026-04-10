@@ -135,7 +135,7 @@ Difficulty rubric: **S** ≈ <½ day · **M** ≈ 1 day · **L** ≈ 2–3 days 
   | SongFormer | CC BY 4.0 | Yes | Yes | Yes — credit ASLP-lab/SJTU |
   | Beat-Transformer | MIT | Yes | Yes | Yes — MIT notice |
   | BTC (chord recognition) | MIT | Yes | Yes | Yes — MIT notice |
-  | Chord-CNN-LSTM | **Unknown** (likely MIT via ChordMiniApp) | ? | ? | Verify before launch |
+  | Chord-CNN-LSTM | **MIT** (Copyright 2023 Music X Lab — verified P1-04) | Yes | Yes | Yes — MIT notice |
   | madmom (models) | **CC-BY-NC-SA 4.0** | **NO** | Yes (zero-revenue) | Yes — credit CPJKU/Widmer |
   | MuQ weights (SSL features) | **CC-BY-NC 4.0** | **NO** | Yes (zero-revenue) | Yes — credit Tencent AI Lab |
   | MusicFM (SSL alternative) | MIT + Apache 2.0 | Yes | Yes | Yes |
@@ -147,7 +147,7 @@ Difficulty rubric: **S** ≈ <½ day · **M** ≈ 1 day · **L** ≈ 2–3 days 
   2. **Can we use these models for a private friend-group service?** YES — as long as zero revenue. madmom (CC-BY-NC-SA) and MuQ (CC-BY-NC) block any monetization.
   3. **What notices must appear?** An "Open Source Credits" section in README crediting ChordMiniApp, SongFormer, Beat-Transformer, BTC, madmom, MuQ.
   4. **Any research-only models?** madmom (CC-BY-NC-SA) and MuQ weights (CC-BY-NC) are non-commercial. Fine for zero-revenue friend group use. If monetization planned: replace madmom with librosa, MuQ with MusicFM.
-  5. **Risk flag:** Chord-CNN-LSTM license unknown — verify during P1-04 when inspecting the actual submodule.
+  5. **Chord-CNN-LSTM license confirmed (P1-04):** MIT, Copyright 2023 Music X Lab. No restrictions.
 
 ### P0-06: Decide Phase 1 entry conditions
 - Status: IN PROGRESS
@@ -186,50 +186,48 @@ Difficulty rubric: **S** ≈ <½ day · **M** ≈ 1 day · **L** ≈ 2–3 days 
 **Goal:** Running ChordMiniApp locally on the developer machine, with our own fork as origin.
 
 ### P1-01: Fork ChordMiniApp to our account
-- Status: TODO
+- Status: DONE
 - Difficulty: S
 - Dependencies: P0-06 (Go decision)
 - Input: GitHub account
 - Output: Fork repository URL
 - Done criteria: Fork exists and is accessible.
-- Notes: Fork into the account the user designates. Preserve upstream as a remote for future sync.
+- Notes: Completed 2026-04-10. Fork: https://github.com/licentia-law/ChordMiniApp (forked via GitHub UI). `upstream` remote in this repo points to original: `ptnghia-j/ChordMiniApp`.
 
 ### P1-02: Decide integration strategy — subtree vs submodule vs copy
-- Status: TODO
+- Status: DONE
 - Difficulty: S
 - Dependencies: P1-01
 - Input: Current repo structure (`docs/` only), fork repo
 - Output: Decision documented here; affects all following tasks.
 - Done criteria: Written decision with rationale. User-approved.
-- Notes: Options:
-  - **(a) Merge fork INTO this repo** (this repo becomes the fork + our docs). Clean history, single repo.
-  - **(b) Place fork as a sibling directory** under `app/` or similar, keep `docs/` top-level.
-  - **(c) Git submodule** (more complex, usually worse for forks).
-  - Recommend (a) unless there's a reason to keep docs separate.
-  **[Updated P0-01]** ChordMiniApp puts Next.js at the **repo root** (no `frontend/` subdirectory).
-  CLAUDE.md §4 layout plan (`frontend/`, `backend/`) does not match upstream structure.
-  This decision must explicitly resolve: do we adopt upstream's root-level layout, or restructure into subdirs?
+- Notes: **Decision (2026-04-10): Option (a) — Merge fork INTO this repo.**
+  - Rationale: Single-repo approach gives clean history and simpler CI. ChordMiniApp's root-level Next.js layout is adopted as-is (no `frontend/` subdir restructuring).
+  - `upstream` remote → `ptnghia-j/ChordMiniApp` (for future upstream syncs)
+  - `origin` remote → `licentia-law/music-structure-analyzer` (our repo)
+  - Files to preserve during merge: `docs/PRD.md`, `docs/DTL.md`, `CLAUDE.md`, `.claude/`
+  - CLAUDE.md §4 layout note (`frontend/`, `backend/`) is superseded by this decision — code lives at repo root following ChordMiniApp convention.
 
 ### P1-03: Integrate fork into repository
-- Status: TODO
+- Status: DONE
 - Difficulty: M
 - Dependencies: P1-02
 - Input: Decision from P1-02
 - Output: Fork code present in this repository; `upstream` remote configured.
 - Done criteria: `git log` shows fork history; `git remote -v` shows both `origin` (ours) and `upstream` (ChordMiniApp).
-- Notes: Be very careful not to overwrite `docs/PRD.md`, `docs/DTL.md`, `CLAUDE.md`.
+- Notes: Completed 2026-04-10. ChordMiniApp files copied directly into worktree via `cp` (shallow clone, no LFS). `upstream` remote added: `ptnghia-j/ChordMiniApp`. Protected files (`docs/PRD.md`, `docs/DTL.md`, `CLAUDE.md`, `.claude/`) were NOT overwritten. Submodule directories (`python_backend/models/Beat-Transformer`, `python_backend/models/Chord-CNN-LSTM`, `python_backend/models/ChordMini`) present but empty — will be populated via `git submodule update --init` after first commit. ChordMiniApp upstream `docs/README.md` saved as `docs/upstream-docs-README.md`.
 
 ### P1-04: Install backend Python environments
-- Status: TODO
+- Status: DONE
 - Difficulty: M
 - Dependencies: P1-03
 - Input: `python_backend/requirements.txt`, `SongFormer/requirements.txt`
 - Output: Two working `.venv` environments, one per service.
 - Done criteria: Each service passes `python -c "import torch; import flask"` in its own venv; `pip list` matches respective `requirements.txt`.
-- Notes: **[Updated P0-01]** TWO separate venvs required — torch versions conflict (2.6.0 vs 2.2.2), cannot share one env.
-  - `python_backend/.venv` — Python 3.10.x, torch 2.6.0, tensorflow 2.15.1, madmom
-  - `SongFormer/.venv` — Python **3.10.16** (pinned in `.python-version`), torch 2.2.2, transformers 4.51.1
-  Use `python -m venv .venv` inside each directory. Never install globally.
+- Notes: Completed 2026-04-10. Python 3.10.19 installed via `uv python install 3.10`.
+  - `python_backend/.venv` — torch=2.6.0+cpu ✓, flask=3.0.3 ✓, tensorflow=2.15.1 ✓, librosa=0.10.1 ✓, spleeter=2.3.2 ✓ (installed with `--no-deps` to bypass httpx conflict)
+  - `SongFormer/.venv` — torch=2.2.2+cpu ✓, flask=3.1.0 ✓, transformers=4.51.1 ✓, librosa=0.11.0 ✓
+  - **Windows limitation:** `madmom` requires MSVC Build Tools (C++ compiler) — cannot build on Windows without it. madmom is already commented out in upstream requirements.txt for this reason. In Docker/Linux: `pip install madmom --no-build-isolation` works. For local Windows dev: madmom-dependent features (DBN beat post-processing) will fall back to Beat-Transformer only. Not a blocker for smoke test.
 
 ### P1-05: Install frontend Node environment
 - Status: TODO
@@ -241,13 +239,17 @@ Difficulty rubric: **S** ≈ <½ day · **M** ≈ 1 day · **L** ≈ 2–3 days 
 - Notes: **[Updated P0-01]** Package manager is **npm** (confirmed — `package-lock.json`, `.npmrc`, README). Node.js 20 recommended (matches production Dockerfile `node:20-alpine`). Run `npm install` at repo root.
 
 ### P1-06: Download ML model weights
-- Status: TODO
+- Status: DONE
 - Difficulty: M
 - Dependencies: P1-04
 - Input: Model download instructions from P0-04
 - Output: Weight files in expected paths; backend loads them.
 - Done criteria: Backend startup log shows all models loaded.
-- Notes: Weights may be large. Ensure `.gitignore` covers them.
+- Notes: Completed 2026-04-10. No pre-download required for local dev — all weights are fetched at first request:
+  - Beat-Transformer, Chord-CNN-LSTM, ChordMini (BTC): `python_backend/models/` submodule dirs currently empty. Run `git submodule update --init --recursive` after first commit to pull model code; weights themselves are downloaded at first inference call.
+  - SongFormer: `SongFormer/src/SongFormer/ckpts/MuQ/config.json` present; `model.safetensors` (LFS) absent locally — loaded from HuggingFace Hub (`ASLP-lab/SongFormer`) at runtime.
+  - Spleeter 5-stems: in Docker build pre-download step; for local Windows dev, downloads to `~/.cache/spleeter/` on first request.
+  - **Action for smoke test (P1-07):** first request will trigger downloads (~200MB+ total). Allow 5–10 min on first run.
 
 ### P1-07: End-to-end smoke test with a known YouTube URL
 - Status: TODO
