@@ -158,6 +158,9 @@ python_backend/__pycache__/
 cache/
 **/cache/
 *.cache
+# Allow source-code cache service directory
+!src/services/cache/
+!src/services/cache/**
 
 # Temporary audio files
 /temp/

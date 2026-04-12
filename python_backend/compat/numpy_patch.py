@@ -31,25 +31,21 @@ def patch_numpy_compatibility():
     msgs = []
 
     # Restore deprecated numpy attributes if they don't exist
-    with warnings.catch_warnings():
-        warnings.simplefilter("ignore", FutureWarning)
-        warnings.simplefilter("ignore", DeprecationWarning)
+    if not hasattr(np, 'float'):
+        np.float = np.float64
+        msgs.append("Applied numpy patch: np.float -> np.float64")
 
-        if not hasattr(np, 'float'):
-            np.float = np.float64
-            msgs.append("Applied numpy patch: np.float -> np.float64")
+    if not hasattr(np, 'int'):
+        np.int = np.int_
+        msgs.append("Applied numpy patch: np.int -> np.int_")
 
-        if not hasattr(np, 'int'):
-            np.int = np.int_
-            msgs.append("Applied numpy patch: np.int -> np.int_")
+    if not hasattr(np, 'complex'):
+        np.complex = np.complex128
+        msgs.append("Applied numpy patch: np.complex -> np.complex128")
 
-        if not hasattr(np, 'complex'):
-            np.complex = np.complex128
-            msgs.append("Applied numpy patch: np.complex -> np.complex128")
-
-        if not hasattr(np, 'bool'):
-            np.bool = np.bool_
-            msgs.append("Applied numpy patch: np.bool -> np.bool_")
+    if not hasattr(np, 'bool'):
+        np.bool = np.bool_
+        msgs.append("Applied numpy patch: np.bool -> np.bool_")
 
     if _DEBUG and not _LOGGED and msgs:
         for m in msgs:
